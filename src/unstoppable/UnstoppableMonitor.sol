@@ -22,8 +22,7 @@ contract UnstoppableMonitor is Owned, IERC3156FlashBorrower {
 
     function onFlashLoan(address initiator, address token, uint256 amount, uint256 fee, bytes calldata)
         external
-        returns (bytes32)
-    {
+        returns (bytes32){
         if (initiator != address(this) || msg.sender != address(vault) || token != address(vault.asset()) || fee != 0) {
             revert UnexpectedFlashLoan();
         }

