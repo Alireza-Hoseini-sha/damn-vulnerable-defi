@@ -93,7 +93,7 @@ contract FreeRiderNFTMarketplace is ReentrancyGuard {
         if (priceToPay == 0) {
             revert TokenNotOffered(tokenId);
         }
-
+        // @audit-issue we can Buy all the token with 15 ether msg.value
         if (msg.value < priceToPay) {
             revert InsufficientPayment();
         }
@@ -103,8 +103,8 @@ contract FreeRiderNFTMarketplace is ReentrancyGuard {
         // transfer from seller to buyer
         DamnValuableNFT _token = token; // cache for gas savings
         _token.safeTransferFrom(_token.ownerOf(tokenId), msg.sender, tokenId);
-
         // pay seller using cached token
+        // @audit-issue - the owner and buyer will be the same - U should first pay the owner then transfer the token
         payable(_token.ownerOf(tokenId)).sendValue(priceToPay);
 
         emit NFTBought(msg.sender, tokenId, priceToPay);
