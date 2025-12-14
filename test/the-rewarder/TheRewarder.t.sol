@@ -66,17 +66,13 @@ contract TheRewarderChallenge is Test {
         // Create DVT distribution
         dvt.approve(address(distributor), TOTAL_DVT_DISTRIBUTION_AMOUNT);
         distributor.createDistribution({
-            token: IERC20(address(dvt)),
-            newRoot: dvtRoot,
-            amount: TOTAL_DVT_DISTRIBUTION_AMOUNT
+            token: IERC20(address(dvt)), newRoot: dvtRoot, amount: TOTAL_DVT_DISTRIBUTION_AMOUNT
         });
 
         // Create WETH distribution
         weth.approve(address(distributor), TOTAL_WETH_DISTRIBUTION_AMOUNT);
         distributor.createDistribution({
-            token: IERC20(address(weth)),
-            newRoot: wethRoot,
-            amount: TOTAL_WETH_DISTRIBUTION_AMOUNT
+            token: IERC20(address(weth)), newRoot: wethRoot, amount: TOTAL_WETH_DISTRIBUTION_AMOUNT
         });
 
         // Let's claim rewards for Alice.
@@ -147,9 +143,7 @@ contract TheRewarderChallenge is Test {
     /**
      * CODE YOUR SOLUTION HERE
      */
-    function test_theRewarder() public checkSolvedByPlayer {
-        
-    }
+    function test_theRewarder() public checkSolvedByPlayer {}
 
     /**
      * CHECKS SUCCESS CONDITIONS - DO NOT TOUCH

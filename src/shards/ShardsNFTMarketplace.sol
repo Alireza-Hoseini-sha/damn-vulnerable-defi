@@ -68,12 +68,7 @@ contract ShardsNFTMarketplace is IShardsNFTMarketplace, IERC721Receiver, ERC1155
 
         // create and store new offer
         offers[offerCount] = Offer({
-            nftId: nftId,
-            totalShards: totalShards,
-            stock: totalShards,
-            price: price,
-            seller: msg.sender,
-            isOpen: true
+            nftId: nftId, totalShards: totalShards, stock: totalShards, price: price, seller: msg.sender, isOpen: true
         });
 
         nftToOffers[nftId] = offerCount;
@@ -123,7 +118,8 @@ contract ShardsNFTMarketplace is IShardsNFTMarketplace, IERC721Receiver, ERC1155
         offer.stock -= want;
         purchaseIndex = purchases[offerId].length;
         uint256 _currentRate = rate;
-        purchases[offerId].push(
+        purchases[offerId]
+        .push(
             Purchase({
                 shards: want,
                 rate: _currentRate,

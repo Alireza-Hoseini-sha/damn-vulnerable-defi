@@ -9,7 +9,9 @@ import {SafeProxy} from "@safe-global/safe-smart-account/contracts/proxies/SafeP
 import {DamnValuableToken} from "../../src/DamnValuableToken.sol";
 import {WalletDeployer} from "../../src/wallet-mining/WalletDeployer.sol";
 import {
-    AuthorizerFactory, AuthorizerUpgradeable, TransparentProxy
+    AuthorizerFactory,
+    AuthorizerUpgradeable,
+    TransparentProxy
 } from "../../src/wallet-mining/AuthorizerFactory.sol";
 import {
     ICreateX,
@@ -84,10 +86,11 @@ contract WalletMiningChallenge is Test {
         aims[0] = USER_DEPOSIT_ADDRESS;
 
         AuthorizerFactory authorizerFactory = AuthorizerFactory(
-            ICreateX(CREATEX_ADDRESS).deployCreate2({
-                salt: bytes32(keccak256("dvd.walletmining.authorizerfactory")),
-                initCode: type(AuthorizerFactory).creationCode
-            })
+            ICreateX(CREATEX_ADDRESS)
+                .deployCreate2({
+                    salt: bytes32(keccak256("dvd.walletmining.authorizerfactory")),
+                    initCode: type(AuthorizerFactory).creationCode
+                })
         );
         authorizer = AuthorizerUpgradeable(authorizerFactory.deployWithProxy(wards, aims, upgrader));
 
@@ -99,19 +102,20 @@ contract WalletMiningChallenge is Test {
             address(SAFE_SINGLETON_FACTORY_ADDRESS).call(bytes.concat(bytes32(""), type(Safe).creationCode));
         singletonCopy = Safe(payable(address(uint160(bytes20(returndata)))));
 
-        (success, returndata) =
-            address(SAFE_SINGLETON_FACTORY_ADDRESS).call(bytes.concat(bytes32(""), type(SafeProxyFactory).creationCode));
+        (success, returndata) = address(SAFE_SINGLETON_FACTORY_ADDRESS)
+            .call(bytes.concat(bytes32(""), type(SafeProxyFactory).creationCode));
         proxyFactory = SafeProxyFactory(address(uint160(bytes20(returndata))));
 
         // Deploy wallet deployer
         walletDeployer = WalletDeployer(
-            ICreateX(CREATEX_ADDRESS).deployCreate2({
-                salt: bytes32(keccak256("dvd.walletmining.walletdeployer")),
-                initCode: bytes.concat(
-                    type(WalletDeployer).creationCode,
-                    abi.encode(address(token), address(proxyFactory), address(singletonCopy), deployer) // constructor args are appended at the end of creation code
-                )
-            })
+            ICreateX(CREATEX_ADDRESS)
+                .deployCreate2({
+                    salt: bytes32(keccak256("dvd.walletmining.walletdeployer")),
+                    initCode: bytes.concat(
+                        type(WalletDeployer).creationCode,
+                        abi.encode(address(token), address(proxyFactory), address(singletonCopy), deployer) // constructor args are appended at the end of creation code
+                    )
+                })
         );
 
         // Set authorizer in wallet deployer
@@ -156,9 +160,7 @@ contract WalletMiningChallenge is Test {
     /**
      * CODE YOUR SOLUTION HERE
      */
-    function test_walletMining() public checkSolvedByPlayer {
-        
-    }
+    function test_walletMining() public checkSolvedByPlayer {}
 
     /**
      * CHECKS SUCCESS CONDITIONS - DO NOT TOUCH

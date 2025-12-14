@@ -155,12 +155,11 @@ contract PuppetAttack {
     function _ethNeeded() internal view returns (uint256) {
         return _computeOraclePrice() * tokenInPool * DEPOSIT_FACTOR / 1e18;
     }
-    
+
     function _computeOraclePrice() internal view returns (uint256) {
         // calculates the price of the token in wei according to Uniswap pair
         return address(uniswapPair).balance * (10 ** 18) / token.balanceOf(address(uniswapPair));
     }
-
 
     receive() external payable {}
 }
